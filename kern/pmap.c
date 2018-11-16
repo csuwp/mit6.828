@@ -155,6 +155,7 @@ mem_init(void)
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
 	// LAB 3: Your code here.
+    envs = (struct Env *)boot_alloc( sizeof(struct Env)*NENV );
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -177,13 +178,7 @@ mem_init(void)
 	//      (ie. perm = PTE_U | PTE_P)
 	//    - pages itself -- kernel RW, user NONE
 	// Your code goes here:
-    
-
     boot_map_region(kern_pgdir,UPAGES            , PTSIZE   , PADDR(pages)    , PTE_U);
-    boot_map_region(kern_pgdir,KSTACKTOP-KSTKSIZE, KSTKSIZE , PADDR(bootstack), PTE_W);
-    boot_map_region(kern_pgdir,KERNBASE          , -KERNBASE, 0               , PTE_W);
-    
-
 	//////////////////////////////////////////////////////////////////////
 	// Map the 'envs' array read-only by the user at linear address UENVS
 	// (ie. perm = PTE_U | PTE_P).
@@ -191,6 +186,9 @@ mem_init(void)
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
+
+
+     boot_map_region(kern_pgdir,UENVS, ROUNDUP(sizeof(struct Env) * NENV,PGSIZE), PADDR(envs), PTE_U | PTE_P);
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -203,6 +201,7 @@ mem_init(void)
 	//       overwrite memory.  Known as a "guard page".
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
+    boot_map_region(kern_pgdir,KSTACKTOP-KSTKSIZE, KSTKSIZE , PADDR(bootstack), PTE_W);
 
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE.
@@ -212,6 +211,7 @@ mem_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
+    boot_map_region(kern_pgdir,KERNBASE          , -KERNBASE, 0               , PTE_W);
 
 	// Check that the initial page directory has been set up correctly.
 	check_kern_pgdir();
@@ -308,6 +308,7 @@ page_init(void)
 struct PageInfo *
 page_alloc(int alloc_flags)
 {
+
     if (page_free_list) {
         struct PageInfo *ret = page_free_list;
         page_free_list = page_free_list->pp_link;
@@ -393,7 +394,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
         }
     }
     else {
-       pde_t      pde = pgdir[PDX(va)];
+       pde_t       pde = pgdir[PDX(va)];
        physaddr_t *pt_addr =KADDR(PTE_ADDR(pde));
        return &pt_addr[PTX(va)];
     }
@@ -553,7 +554,21 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
-
+    
+    void * start =(void *) va;
+    void * end   =(void *) (va + len);
+    void * ptr;
+    for (ptr = start; ptr < end; ptr = ROUNDUP(PGSIZE + ptr,PGSIZE)) {
+        if ((int)ptr > ULIM) {
+            user_mem_check_addr = (int)ptr;
+            return -E_FAULT;
+        }
+        pte_t *pte = (pte_t *)pgdir_walk(env->env_pgdir, ptr, false);
+        if ((pte == NULL)||(*pte & perm) != perm){
+            user_mem_check_addr = (int)ptr;
+            return -E_FAULT; 
+         }
+    }
 	return 0;
 }
 
@@ -742,7 +757,7 @@ check_kern_pgdir(void)
 	// check envs array (new test for lab 3)
 	n = ROUNDUP(NENV*sizeof(struct Env), PGSIZE);
 	for (i = 0; i < n; i += PGSIZE)
-		assert(check_va2pa(pgdir, UENVS + i) == PADDR(envs) + i);
+        assert(check_va2pa(pgdir, UENVS + i) == PADDR(envs) + i);
 
 	// check phys mem
 	for (i = 0; i < npages * PGSIZE; i += PGSIZE)
