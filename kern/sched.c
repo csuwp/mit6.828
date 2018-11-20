@@ -31,24 +31,22 @@ sched_yield(void)
 	// LAB 4: Your code here.
     
     
-    
-    
-    
-
-    envid_t index = ENVX(thiscpu->cpu_env->env_id);
-
-    // cprintf("[%08x] new env %08x\n", curenv ? curenv->env_id : 0, e->env_id); 
     int i;
-    for ( i = ((index + 1)%NENV); i != index; i = (i+1)%NENV ) {
-           if (envs[i].env_status == ENV_RUNNABLE)
-               env_run(&envs[i]);
+    if (!curenv) {
+        for (i = 0;i < NENV; i++) {
+            if (envs[i].env_status == ENV_RUNNABLE)
+                env_run(&envs[i]);
+        }
+    } 
+    else { 
+        envid_t index = ENVX(curenv->env_id);
+        for ( i = ((index + 1)%NENV); i != index; i = (i+1)%NENV ) {
+            if (envs[i].env_status == ENV_RUNNABLE)
+                env_run(&envs[i]);
+        }
+        if (i == index || curenv->env_status==ENV_RUNNING)
+            env_run(&envs[i]);
     }
-
-    if (i == index )
-        env_run(&envs[i]);
-        
-     
-
 	// sched_halt never returns
 	sched_halt();
 }
