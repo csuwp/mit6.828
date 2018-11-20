@@ -123,6 +123,7 @@ env_init(void)
     for (i = NENV - 1; i >=0 ; i--) {
         envs[i].env_id = 0;
         envs[i].env_link = env_free_list;
+        envs[i].env_type =  ENV_FREE;
         env_free_list = &envs[i];
     }
     
@@ -550,5 +551,7 @@ env_run(struct Env *e)
         e->env_runs++;
         lcr3(PADDR(e->env_pgdir));
     }
+    unlock_kernel();
     env_pop_tf(&e->env_tf);
+
 }
