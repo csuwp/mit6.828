@@ -71,6 +71,7 @@ trap_init(void)
 {
 	extern struct Segdesc gdt[];
     
+
 	// LAB 3: Your code here.
    	void DIVIDE();
 	SETGATE(idt[0], 0, GD_KT, DIVIDE, 0);
@@ -109,7 +110,41 @@ trap_init(void)
 	void SIMDERR();
 	SETGATE(idt[19], 0, GD_KT, SIMDERR, 0);
     void SYSCALL();
-    SETGATE(idt[T_SYSCALL],1,GD_KT,SYSCALL,3);
+    SETGATE(idt[T_SYSCALL],0,GD_KT,SYSCALL,3);
+
+    extern void t_irq0();
+    extern void t_irq1();
+    extern void t_irq2();
+    extern void t_irq3();
+    extern void t_irq4();
+    extern void t_irq5();
+    extern void t_irq6();
+    extern void t_irq7();
+    extern void t_irq8();
+    extern void t_irq9();
+    extern void t_irq10();
+    extern void t_irq11();
+    extern void t_irq12();
+    extern void t_irq13();
+    extern void t_irq14();
+    extern void t_irq15();
+
+    SETGATE(idt[IRQ_OFFSET + 0], 0, GD_KT, t_irq0, 0);
+    SETGATE(idt[IRQ_OFFSET + 1], 0, GD_KT, t_irq1, 0);
+    SETGATE(idt[IRQ_OFFSET + 2], 0, GD_KT, t_irq2, 0);
+    SETGATE(idt[IRQ_OFFSET + 3], 0, GD_KT, t_irq3, 0);
+    SETGATE(idt[IRQ_OFFSET + 4], 0, GD_KT, t_irq4, 0);
+    SETGATE(idt[IRQ_OFFSET + 5], 0, GD_KT, t_irq5, 0);
+    SETGATE(idt[IRQ_OFFSET + 6], 0, GD_KT, t_irq6, 0);
+    SETGATE(idt[IRQ_OFFSET + 7], 0, GD_KT, t_irq7, 0);
+    SETGATE(idt[IRQ_OFFSET + 8], 0, GD_KT, t_irq8, 0);
+    SETGATE(idt[IRQ_OFFSET + 9], 0, GD_KT, t_irq9, 0);
+    SETGATE(idt[IRQ_OFFSET + 10], 0, GD_KT, t_irq10, 0);
+    SETGATE(idt[IRQ_OFFSET + 11], 0, GD_KT, t_irq11, 0);
+    SETGATE(idt[IRQ_OFFSET + 12], 0, GD_KT, t_irq12, 0);
+    SETGATE(idt[IRQ_OFFSET + 13], 0, GD_KT, t_irq13, 0);
+    SETGATE(idt[IRQ_OFFSET + 14], 0, GD_KT, t_irq14, 0);
+    SETGATE(idt[IRQ_OFFSET + 15], 0, GD_KT, t_irq15, 0);
 	// Per-CPU setup 
 	trap_init_percpu();
 }
@@ -219,11 +254,6 @@ trap_dispatch(struct Trapframe *tf)
 	// Handle spurious interrupts
 	// The hardware sometimes raises these because of noise on the
 	// IRQ line or other reasons. We don't care.
-	if (tf->tf_trapno == IRQ_OFFSET + IRQ_SPURIOUS) {
-		cprintf("Spurious interrupt on irq 7\n");
-		print_trapframe(tf);
-		return;
-	}
 
 	// Handle clock interrupts. Don't forget to acknowledge the
 	// interrupt using lapic_eoi() before calling the scheduler!
@@ -243,7 +273,11 @@ trap_dispatch(struct Trapframe *tf)
             break;
     }
 
-
+    if (tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER) {
+        lapic_eoi();
+        sched_yield();
+        return;
+    }  
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
 	if (tf->tf_cs == GD_KT)

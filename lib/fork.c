@@ -73,17 +73,22 @@ duppage(envid_t envid, unsigned pn)
    
     void *addr = (void *) (pn * PGSIZE);
       
-    if ((uvpt[pn] & PTE_W) || uvpt[pn] & PTE_COW) {
-        if ((r = sys_page_map(0,addr,envid,addr, PTE_P | PTE_U | PTE_COW))<0)
+    if ((uvpt[pn] & PTE_W) || (uvpt[pn] & PTE_COW)) {
+        if ((r = sys_page_map(0,addr,envid,addr, PTE_P | PTE_U | PTE_COW)) < 0)
             panic("duppage:%e\n",r);
         if ((r = sys_page_map(0,addr,0    ,addr, PTE_P | PTE_U | PTE_COW)) < 0)
             panic("duppage:%e\n",r);
-    }else if ((r = sys_page_map(0,addr,envid,addr,PTE_P | PTE_U))<0) {
+    }else if ((r = sys_page_map(0,addr,envid,addr,PTE_P | PTE_U))<0) 
         panic("duppage:%e\n",r);
 
-    } 
+    
 	return 0;
 }
+
+
+
+
+
 
 //
 // User-level fork with copy-on-write.
@@ -109,27 +114,31 @@ fork(void)
     uintptr_t addr;
     set_pgfault_handler(pgfault);
 
-    if ((envid= sys_exofork())== 0){
+    if (( envid = sys_exofork()) == 0){
         thisenv = &envs[ENVX(sys_getenvid())];
         return 0;
     }   
 
     for (addr = 0; addr < USTACKTOP; addr += PGSIZE) {
-        if ((uvpt[PDX(addr)] & PTE_P) && (uvpt[PGNUM(addr)] & PTE_P) &&(uvpt[PGNUM(addr)]&PTE_U)) {
+        if ((uvpd[PDX(addr)] & PTE_P) && (uvpt[PGNUM(addr)] & PTE_P)
+                && (uvpt[PGNUM(addr)] & PTE_U))
             duppage(envid, PGNUM(addr));
-        }
+
     }
 
-    if ((r = sys_page_alloc(envid,(void *)(UXSTACKTOP - PGSIZE),PTE_U|PTE_P|PTE_W))< 0)
-        panic("fork %e\n",r);
+
+
+    if ( (r = sys_page_alloc(envid, (void *) (UXSTACKTOP - PGSIZE),
+                            PTE_P|PTE_U|PTE_W)) < 0)
+        panic("fork %e",r);
 
 
     extern void _pgfault_upcall();
     sys_env_set_pgfault_upcall(envid,_pgfault_upcall);
 
-    if ((r = sys_env_set_status(envid,ENV_RUNNABLE)) < 0) {
-        panic("fork:%e\n",r);
-    }
+    if ((r = sys_env_set_status(envid,ENV_RUNNABLE)) < 0) 
+        panic("fork:%e",r);
+
 
     return envid;
     // LAB 4: Your code here.
